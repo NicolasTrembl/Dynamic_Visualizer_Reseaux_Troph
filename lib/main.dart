@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import 'pages/visualizer_page.dart';
 import 'pages/welcome_page.dart';
 
 void main() {
@@ -12,12 +12,26 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      onGenerateRoute: (settings) {
+        switch (settings.name) {
+          case '/':
+            return MaterialPageRoute(builder: (_) => const WelcomePage());
+          case '/visualizer':
+            final String path = settings.arguments as String;
+            return MaterialPageRoute(
+              builder: (_) => VisualizerPage(path: path),
+            );
+          default:
+            return null;
+        }
+      },
       title: 'Dynamic Visualizer',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.cyan),
         useMaterial3: true,
       ),
-      home: const WelcomePage(),
+      initialRoute: '/',
+      // home: const WelcomePage(),
     );
   }
 }

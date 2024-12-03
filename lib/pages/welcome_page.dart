@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-
-import '/pages/visualizer_page.dart';
+import '/widgets/get_path_widget.dart';
 
 class WelcomePage extends StatefulWidget {
   const WelcomePage({super.key});
@@ -10,6 +9,19 @@ class WelcomePage extends StatefulWidget {
 }
 
 class _WelcomePageState extends State<WelcomePage> {
+  Future<String?> getPath() async {
+    await Future.delayed(const Duration(milliseconds: 500));
+    final String? newPath = await showDialog<String>(
+      context: context,
+      builder: (context) => const GetPathDialog(),
+      barrierDismissible: false,
+    );
+    if (newPath != null) {
+      return newPath;
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -26,29 +38,75 @@ class _WelcomePageState extends State<WelcomePage> {
             ),
             BigWelcomeButton(
               children: [
-                Icon(
+                const Icon(
                   Icons.link_outlined,
-                  color: Theme.of(context).colorScheme.onPrimaryContainer,
                   size: 50,
                 ),
                 Text(
-                  'Link to the file',
+                  'Link to the temporary folder',
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.onPrimaryContainer,
                   ),
                 ),
               ],
               onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const VisualizerPage(),
-                  ),
-                );
+                getPath().then((String? path) {
+                  if (path != null) {
+                    Navigator.pushNamed(
+                      context,
+                      "/visualizer",
+                      arguments: path,
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Please select a folder',
+                        ),
+                      ),
+                    );
+                  }
+                });
               },
             ),
-            Text(
-              "You can get the path to link using the 'Get Link' option in the program.",
+            Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: "You can get the link using the ",
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                  TextSpan(
+                    text: "-o",
+                    style: TextStyle(
+                      color: Colors.redAccent.shade400,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  TextSpan(
+                    text: " option or by selecting ",
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                  TextSpan(
+                    text: "get link",
+                    style: TextStyle(
+                      color: Colors.redAccent.shade400,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  TextSpan(
+                    text: " from the menu",
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                ],
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
               style: Theme.of(context).textTheme.bodyMedium,
             ),
           ],

@@ -8,10 +8,12 @@ class SimWidget extends StatefulWidget {
     super.key,
     required this.graph,
     required this.showValue,
+    required this.type,
   });
 
   final Graph graph;
   final bool showValue;
+  final GraphType type;
 
   @override
   State<SimWidget> createState() => _SimWidgetState();
@@ -24,7 +26,6 @@ enum GraphType {
 }
 
 class _SimWidgetState extends State<SimWidget> {
-  GraphType type = GraphType.stackedArea;
   SfCartesianChart chart = const SfCartesianChart();
 
   CartesianSeries getSeries(
@@ -37,7 +38,7 @@ class _SimWidgetState extends State<SimWidget> {
       data.add(line[i]);
     }
 
-    switch (type) {
+    switch (widget.type) {
       case GraphType.stackedArea:
         return StackedAreaSeries(
           name: name,
@@ -81,8 +82,14 @@ class _SimWidgetState extends State<SimWidget> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.graph.sim.iter.isEmpty) {
+      return const Center(
+        child: Text("No simulation data"),
+      );
+    }
     return Container(
-      color: Theme.of(context).colorScheme.primaryContainer,
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 128),
+      color: Theme.of(context).colorScheme.surface,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         mainAxisSize: MainAxisSize.max,
@@ -94,18 +101,14 @@ class _SimWidgetState extends State<SimWidget> {
                 enable: true,
                 format: 'Itération point.x : point.y',
               ),
-              primaryXAxis: const CategoryAxis(
-                  // title: AxisTitle(
-                  //   text: "Iteration",
-                  // ),
-                  ),
+              primaryXAxis: const CategoryAxis(),
               legend: Legend(
                 isVisible: true,
                 title: LegendTitle(
                   text: widget.graph.name,
                 ),
               ),
-              primaryYAxis: (type != GraphType.stackedArea100)
+              primaryYAxis: (widget.type != GraphType.stackedArea100)
                   ? const CategoryAxis(
                       title: AxisTitle(text: "Population"),
                     )
@@ -123,39 +126,6 @@ class _SimWidgetState extends State<SimWidget> {
               ],
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Row(
-              mainAxisSize: MainAxisSize.max,
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                TextButton(
-                  onPressed: () {
-                    setState(() {
-                      type = GraphType.stackedArea;
-                    });
-                  },
-                  child: const Text("Stacked Area"),
-                ),
-                TextButton(
-                  onPressed: () {
-                    setState(() {
-                      type = GraphType.stackedArea100;
-                    });
-                  },
-                  child: const Text("100% Stacked Area"),
-                ),
-                TextButton(
-                  onPressed: () {
-                    setState(() {
-                      type = GraphType.line;
-                    });
-                  },
-                  child: const Text("Line"),
-                ),
-              ],
-            ),
-          )
         ],
       ),
     );

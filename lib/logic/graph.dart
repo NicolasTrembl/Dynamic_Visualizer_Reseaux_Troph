@@ -44,7 +44,7 @@ class Node {
 
     return Node(
       name: name,
-      alias: alias,
+      alias: alias.trim(),
       deathRate: deathRate,
       birthRate: birthRate,
       capacity: capacity,
@@ -207,6 +207,10 @@ class Graph {
           iterOrder
             ..removeRange(0, 2)
             ..removeLast();
+
+          for (int i = 0; i < iterOrder.length; i++) {
+            iterOrder[i] = iterOrder[i].trim();
+          }
         }
         continue;
       }

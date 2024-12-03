@@ -2,98 +2,73 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_graph_view/flutter_graph_view.dart' as graphview;
-
-import '/logic/save.dart';
 import '/logic/graph.dart';
-import '/widgets/sim_widget.dart';
+import 'package:flutter_force_directed_graph/flutter_force_directed_graph.dart'
+    as fdg;
 
 class GraphWidget extends StatefulWidget {
   const GraphWidget({
     super.key,
-    required this.paths,
+    required this.path,
+    required this.graph,
+    this.iteration,
+    required this.setFocused,
   });
-
-  final List<String> paths;
+  final String path;
+  final Graph graph;
+  final int? iteration;
+  final Function setFocused;
 
   @override
   State<GraphWidget> createState() => _GraphWidgetState();
 }
 
 class _GraphWidgetState extends State<GraphWidget> {
-  Graph? graph;
+  fdg.ForceDirectedGraphController controller =
+      fdg.ForceDirectedGraphController(
+    minScale: 0.01,
+    maxScale: 10,
+  );
+
   File? dir;
-  File? fileEco;
-  File? fileSim;
+  late StreamSubscription<FileSystemEvent> sub;
 
-  late StreamSubscription sub;
-
-  // late graphview.SugiyamaConfiguration config;
-
-  // -1 only eco, 0 both, 1 only sim
-
-  bool canShowBoth = false;
-  bool showValue = false;
-  int choiceShow = 0;
-  Map graphData = {};
-
-  void getGraph(String eco, String sim) {
-    graph = Graph.fromFile(eco, sim);
-
-    buildGraph();
-
+  void populateGraph() {
+    for (Node node in widget.graph.nodes) {
+      controller.addNode(node);
+    }
+    for (MyEdge edge in widget.graph.edges) {
+      controller.addEdgeByData(
+        widget.graph.nodes.firstWhere((e) => e.alias == edge.source),
+        widget.graph.nodes.firstWhere((e) => e.alias == edge.target),
+      );
+    }
     setState(() {});
   }
 
-  void buildGraph() {
-    graphData.clear();
-
-    //nodes
-
-    var vertices = [];
-
-    for (Node node in graph!.nodes) {
-      vertices.add({
-        "id": node.id,
-        "tag": node.alias,
-        "name": node.name,
-        "alias": node.alias,
-        "deathRate": node.deathRate,
-        "birthRate": node.birthRate,
-        "capacity": node.capacity,
-        "population": node.population,
-        "biosmassPerCapita": node.biosmassPerCapita,
-      });
+  bool nodeATargetB(Node a, Node b) {
+    for (MyEdge edge in widget.graph.edges) {
+      if (edge.source == a.alias && edge.target == b.alias) {
+        return true;
+      }
     }
+    return false;
+  }
 
-    //edges
-
-    var edges = [];
-    for (MyEdge edge in graph!.edges) {
-      edges.add({
-        "srcId": graph!.nodes
-            .firstWhere((element) => element.alias == edge.source)
-            .id,
-        "dstId": graph!.nodes
-            .firstWhere((element) => element.alias == edge.target)
-            .id,
-        "edgeName": "${edge.source} → ${edge.target}",
-        "weight": edge.weight,
-        "ranking": 0,
-        "predationRate": edge.predationRate,
-        "assimilationRate": edge.assimilationRate,
-      });
+  int getNumber(int iter, Node node) {
+    int index = widget.graph.sim.iterOrder.indexOf(node.alias);
+    if (index == -1) {
+      print("Could not find node in sim");
+      print(widget.graph.sim.iterOrder.join("|"));
+      print(node.alias);
+      return 0;
     }
-
-    graphData = {
-      "vertexes": vertices,
-      "edges": edges,
-    };
+    return widget.graph.sim.iter[iter][index];
   }
 
   @override
   void dispose() {
-    sub.cancel();
+    controller.dispose();
     super.dispose();
   }
 
@@ -101,302 +76,106 @@ class _GraphWidgetState extends State<GraphWidget> {
   void initState() {
     super.initState();
 
-    dir = File(widget.paths[0].replaceAll("\\output.eco", ""));
-    fileEco = File(widget.paths[0]);
-    fileSim = File(widget.paths[1]);
+    populateGraph();
 
-    fileEco!.readAsString().then((String eco) {
-      fileSim!.readAsString().then((String sim) {
-        if (sim.contains(":-")) {
-          canShowBoth = true;
-        }
-        getGraph(eco, sim);
-      });
-    });
+    dir = File(widget.path);
 
     sub = dir!.watch().listen((event) {
-      print("ev" + event.toString());
       if (event.type != FileSystemEvent.modify) {
-        print("You can't modify the file !!!!!!!!!!!!");
-        Navigator.pop(context);
+        Navigator.popUntil(context, ModalRoute.withName('/'));
         return;
       }
 
-      String sim = fileSim!.readAsStringSync();
-
-      if (sim.contains(":-")) {
-        canShowBoth = true;
-      } else {
-        canShowBoth = false;
-      }
-      getGraph(fileEco!.readAsStringSync(), sim);
+      Future.delayed(const Duration(milliseconds: 500)).then(
+        (_) => setState(
+          () {
+            // controller.dispose();
+            controller = fdg.ForceDirectedGraphController(
+              minScale: 0.01,
+              maxScale: 10,
+            );
+            populateGraph();
+            controller.needUpdate();
+          },
+        ),
+      );
+      return;
     });
-  }
-
-  Widget vertexPanelBuilder(hoverVertex, graphview.Viewfinder viewfinder) {
-    var c = viewfinder.localToGlobal(hoverVertex.cpn!.position);
-    return Stack(
-      children: [
-        Positioned(
-          left: c.x + hoverVertex.radius + 5,
-          top: c.y - 20,
-          child: SizedBox(
-            width: 180,
-            child: ColoredBox(
-              color:
-                  Theme.of(context).colorScheme.secondaryContainer.withOpacity(
-                        .5,
-                      ),
-              child: ListTile(
-                title: Text(
-                  '${hoverVertex.data['name']} (${hoverVertex.data['alias']})',
-                ),
-                subtitle: Text(
-                  'Death Rate: ${hoverVertex.data['deathRate']}\n'
-                  'Birth Rate: ${hoverVertex.data['birthRate']}\n'
-                  'Capacity: ${hoverVertex.data['capacity']}\n'
-                  'Population: ${hoverVertex.data['population']}\n'
-                  'Biosmass Per Capita: ${hoverVertex.data['biosmassPerCapita']}',
-                ),
-              ),
-            ),
-          ),
-        )
-      ],
-    );
-  }
-
-  Widget edgePanelBuilder(
-      graphview.Edge hoverEdge, graphview.Viewfinder viewfinder) {
-    var c = viewfinder.localToGlobal(hoverEdge.cpn!.position);
-    return Stack(
-      children: [
-        Positioned(
-          left: c.x,
-          top: c.y - 20,
-          child: SizedBox(
-            width: 180,
-            child: ColoredBox(
-              color:
-                  Theme.of(context).colorScheme.secondaryContainer.withOpacity(
-                        .5,
-                      ),
-              child: ListTile(
-                title: Text(
-                  '${hoverEdge.data['edgeName']}',
-                ),
-                subtitle: Text(
-                  'Weight: ${hoverEdge.data['weight']}\n'
-                  'Predation Rate: ${hoverEdge.data['predationRate']}\n'
-                  'Assimilation Rate: ${hoverEdge.data['assimilationRate']}',
-                ),
-              ),
-            ),
-          ),
-        )
-      ],
-    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Visualizer'),
-        actions: [
-          IconButton(
-            onPressed: () {
-              showValue = !showValue;
-              setState(() {});
+    return Focus(
+      autofocus: true,
+      child: fdg.ForceDirectedGraphWidget(
+        edgeAlwaysUp: false,
+        controller: controller,
+        nodesBuilder: (context, data) {
+          return GestureDetector(
+            onTap: () {
+              widget.setFocused(data);
             },
-            icon: const Icon(Icons.text_snippet_outlined),
-          ),
-          IconButton(
-            onPressed: () {
-              choiceShow++;
-              if (choiceShow > 1) {
-                choiceShow = -1;
-              }
-              setState(() {});
-            },
-            icon: const Icon(Icons.view_agenda_outlined),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: PopupMenuButton(
-              child: const Icon(Icons.download),
-              itemBuilder: (context) {
-                return [
-                  PopupMenuItem(
-                    child: ListTile(
-                      title: const Text("Export as .dot"),
-                      subtitle: const Text(
-                        "Export the nodes and edges as a .dot / .gv file",
-                      ),
-                      onTap: () {
-                        Export().exportToDot(graph);
-                      },
-                    ),
-                  ),
-                  PopupMenuItem(
-                    child: ListTile(
-                      title: const Text("Export as .graphml"),
-                      subtitle: const Text(
-                        "Export the nodes and edges as a .grapml file",
-                      ),
-                      onTap: () {
-                        Export().exportToGrahpml(graph);
-                      },
-                    ),
-                  ),
-                  PopupMenuItem(
-                    child: ListTile(
-                      title: const Text("Export as .gexf"),
-                      subtitle: const Text(
-                        "Export the nodes and edges as a .gexf file (the gephi format)",
-                      ),
-                      onTap: () {
-                        Export().exportToGexf(graph);
-                      },
-                    ),
-                  ),
-                  PopupMenuItem(
-                    child: ListTile(
-                      title: const Text("Export as .json"),
-                      subtitle: const Text(
-                        "Export the graph and the simulation as a .json file",
-                      ),
-                      onTap: () {
-                        Export().exportToJson(graph);
-                      },
-                    ),
-                  ),
-                  PopupMenuItem(
-                    child: ListTile(
-                      title: const Text("Export as .csv"),
-                      subtitle: const Text(
-                        "Export the simulation as a .csv file",
-                      ),
-                      onTap: () {
-                        Export().exportToCsv(graph);
-                      },
-                    ),
-                  ),
-                  PopupMenuItem(
-                    child: ListTile(
-                      title: const Text("Export as .xlsx"),
-                      subtitle: const Text(
-                        "Export the simulation as a .xlsx file (the excel format)",
-                      ),
-                      onTap: () {
-                        Export().exportToXlsx(graph);
-                      },
-                    ),
-                  ),
-                ];
-              },
-            ),
-          ),
-        ],
-      ),
-      body: graphData.isEmpty
-          ? const Center(
-              child: CircularProgressIndicator(
-                color: Colors.cyan,
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.blue,
+                borderRadius: BorderRadius.circular(12),
               ),
-            )
-          : SizedBox.expand(
+              width: 55,
+              height: 45,
+              alignment: Alignment.center,
+              child: widget.iteration != null
+                  ? Text(
+                      "${data.name}\n"
+                      " ${getNumber(widget.iteration!, data as Node)}",
+                      style: const TextStyle(fontSize: 12),
+                    )
+                  : Text('${data.name}'),
+            ),
+          );
+        },
+        edgesBuilder: (context, a, b, distance) {
+          return GestureDetector(
+            onTap: () {
+              widget.setFocused(widget.graph.edges.firstWhere(
+                (e) =>
+                    e.source == (a as Node).alias &&
+                    e.target == (b as Node).alias,
+              ));
+            },
+            child: Container(
+              constraints: const BoxConstraints(
+                minWidth: 1,
+              ),
+              width: distance - 50,
+              height: 50,
+              alignment: Alignment.center,
               child: Stack(
                 children: [
                   Positioned(
-                    // duration: const Duration(milliseconds: 500),
-                    width: MediaQuery.of(context).size.width,
-                    bottom: (choiceShow == 1)
-                        ? MediaQuery.of(context).size.height
-                        : (choiceShow == 0)
-                            ? MediaQuery.of(context).size.height * 1 / 4
-                            : 0,
-                    top: (choiceShow == 1)
-                        ? -MediaQuery.of(context).size.height
-                        : 0,
-                    child: graphview.FlutterGraphWidget(
-                      data: graphData,
-                      convertor: graphview.MapConvertor(),
-                      algorithm: graphview.ForceDirected(
-                        decorators: [
-                          graphview.CoulombDecorator(),
-                          graphview.HookeBorderDecorator(),
-                          graphview.HookeDecorator(),
-                          graphview.CoulombCenterDecorator(),
-                          graphview.HookeCenterDecorator(),
-                          graphview.ForceDecorator(),
-                          graphview.ForceMotionDecorator(),
-                          graphview.TimeCounterDecorator(),
-                        ],
-                      ),
-                      options: graphview.Options()
-                        ..backgroundBuilder = ((context) => Container(
-                              decoration: BoxDecoration(
-                                color: Theme.of(context).colorScheme.surface,
-                                border: Border.all(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .primaryContainer,
-                                ),
-                              ),
-                            ))
-                        ..showText = true
-                        ..textGetter = ((vertex) => vertex.data['name'])
-                        ..panelDelay = const Duration(milliseconds: 250)
-                        ..graphStyle = (graphview.GraphStyle()
-
-                          // tagColor is prior to tagColorByIndex. use vertex.tags to get color
-                          ..tagColor = {'tag8': Colors.orangeAccent.shade200}
-                          ..tagColorByIndex = [
-                            Colors.red.shade200,
-                            Colors.orange.shade200,
-                            Colors.yellow.shade200,
-                            Colors.green.shade200,
-                            Colors.blue.shade200,
-                            Colors.blueAccent.shade200,
-                            Colors.purple.shade200,
-                            Colors.pink.shade200,
-                            Colors.blueGrey.shade200,
-                            Colors.deepOrange.shade200,
-                          ])
-                        ..vertexPanelBuilder = vertexPanelBuilder
-                        ..edgePanelBuilder = edgePanelBuilder,
+                    left: 15,
+                    right: 0,
+                    top: 24,
+                    child: Container(
+                      height: 2,
+                      color: Colors.black,
                     ),
                   ),
-                  Positioned(
-                    // duration: const Duration(milliseconds: 500),
-                    width: MediaQuery.of(context).size.width,
-                    top: (choiceShow == -1)
-                        ? MediaQuery.of(context).size.height
-                        : (choiceShow == 0)
-                            ? MediaQuery.of(context).size.height / 2
-                            : 0,
-                    bottom: (choiceShow == -1)
-                        ? -MediaQuery.of(context).size.height
-                        : 0,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primaryContainer,
-                        border: Border.symmetric(
-                          horizontal: BorderSide(
-                            color: Theme.of(context).colorScheme.onSurface,
-                          ),
-                        ),
-                      ),
-                      child: SimWidget(
-                        graph: graph!,
-                        showValue: showValue,
-                      ),
+                  const Positioned(
+                    left: -10,
+                    // right: 0,
+                    top: 2,
+                    child: Icon(
+                      Icons.arrow_left,
+                      color: Colors.black,
+                      size: 45,
                     ),
                   ),
                 ],
               ),
             ),
+          );
+        },
+      ),
     );
   }
 }
