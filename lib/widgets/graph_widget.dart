@@ -29,13 +29,21 @@ class _GraphWidgetState extends State<GraphWidget> {
 
   void populateGraph() {
     for (Node node in widget.graph.nodes) {
-      controller.addNode(node);
+      try {
+        controller.addNode(node);
+      } catch (e) {
+        print("error");
+      }
     }
     for (MyEdge edge in widget.graph.edges) {
-      controller.addEdgeByData(
-        widget.graph.nodes.firstWhere((e) => e.alias == edge.source),
-        widget.graph.nodes.firstWhere((e) => e.alias == edge.target),
-      );
+      try {
+        controller.addEdgeByNode(
+          controller.graph.nodes.firstWhere((e) => e.data.alias == edge.source),
+          controller.graph.nodes.firstWhere((e) => e.data.alias == edge.target),
+        );
+      } catch (e) {
+        print("error");
+      }
     }
     setState(() {});
   }
