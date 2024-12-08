@@ -1,6 +1,3 @@
-import 'dart:async';
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import '/logic/graph.dart';
 import 'package:flutter_force_directed_graph/flutter_force_directed_graph.dart'
@@ -29,9 +26,6 @@ class _GraphWidgetState extends State<GraphWidget> {
     minScale: 0.01,
     maxScale: 10,
   );
-
-  File? dir;
-  late StreamSubscription<FileSystemEvent> sub;
 
   void populateGraph() {
     for (Node node in widget.graph.nodes) {
@@ -67,6 +61,23 @@ class _GraphWidgetState extends State<GraphWidget> {
   }
 
   @override
+  void didUpdateWidget(covariant GraphWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.graph != widget.graph) {
+      controller.graph.edges.clear();
+      controller.graph.nodes.clear();
+      // controller.dispose();
+      // controller.needUpdate();
+      controller = fdg.ForceDirectedGraphController(
+        minScale: 0.01,
+        maxScale: 10,
+      );
+      populateGraph();
+      controller.needUpdate();
+    }
+  }
+
+  @override
   void dispose() {
     controller.dispose();
     super.dispose();
@@ -78,29 +89,32 @@ class _GraphWidgetState extends State<GraphWidget> {
 
     populateGraph();
 
-    dir = File(widget.path);
+    // dir = File(widget.path);
 
-    sub = dir!.watch().listen((event) {
-      if (event.type != FileSystemEvent.modify) {
-        Navigator.popUntil(context, ModalRoute.withName('/'));
-        return;
-      }
+    // sub = dir!.watch().listen((event) {
+    // if (event.type != FileSystemEvent.modify) {
+    // Navigator.pop(context);
+    // return;
+    // }
 
-      Future.delayed(const Duration(milliseconds: 500)).then(
-        (_) => setState(
-          () {
-            // controller.dispose();
-            controller = fdg.ForceDirectedGraphController(
-              minScale: 0.01,
-              maxScale: 10,
-            );
-            populateGraph();
-            controller.needUpdate();
-          },
-        ),
-      );
-      return;
-    });
+    // update = Future.delayed(const Duration(milliseconds: 500)).then(
+    // (_) => setState(
+    // () {
+    // controller.graph.edges.clear();
+    // controller.graph.nodes.clear();
+    // controller.dispose();
+    // controller.needUpdate();
+    // controller = fdg.ForceDirectedGraphController(
+    // minScale: 0.01,
+    // maxScale: 10,
+    // );
+    // populateGraph();
+    // controller.needUpdate();
+    // },
+    // ),
+    // );
+    // return;
+    // });
   }
 
   @override
@@ -125,11 +139,16 @@ class _GraphWidgetState extends State<GraphWidget> {
               alignment: Alignment.center,
               child: widget.iteration != null
                   ? Text(
-                      "${data.name}\n"
+                      "${data.name.replaceAll("_", " ")}\n"
                       " ${getNumber(widget.iteration!, data as Node)}",
-                      style: const TextStyle(fontSize: 12),
+                      style: const TextStyle(fontSize: 8),
+                      textAlign: TextAlign.center,
                     )
-                  : Text('${data.name}'),
+                  : Text(
+                      '${data.name.replaceAll("_", " ")}',
+                      style: const TextStyle(fontSize: 8),
+                      textAlign: TextAlign.center,
+                    ),
             ),
           );
         },

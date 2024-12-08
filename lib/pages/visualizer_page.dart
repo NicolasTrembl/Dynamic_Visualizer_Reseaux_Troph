@@ -43,30 +43,42 @@ class _VisualizerPageState extends State<VisualizerPage> {
     fileSim = File("${widget.path}\\output.sim");
 
     fileEco!.readAsString().then((String eco) {
-      fileSim!.readAsString().then((String sim) {
+      if (fileSim!.existsSync()) {
+        fileSim!.readAsString().then((String sim) {
+          if (sim.contains(":-")) {
+            noSimData = false;
+          }
+          setState(() {
+            graph = Graph.fromFile(eco, sim);
+          });
+        });
+      } else {
+        setState(() {
+          graph = Graph.fromFile(eco, "");
+        });
+      }
+    });
+
+    sub = dir!.watch().listen((event) {
+      if (event.type != FileSystemEvent.modify &&
+          event.type != FileSystemEvent.create) {
+        Navigator.popAndPushNamed(context, "/");
+        return;
+      }
+
+      if (fileSim!.existsSync()) {
+        String sim = fileSim!.readAsStringSync();
         if (sim.contains(":-")) {
           noSimData = false;
         }
         setState(() {
-          graph = Graph.fromFile(eco, sim);
+          graph = Graph.fromFile(fileEco!.readAsStringSync(), sim);
         });
-      });
-    });
-
-    sub = dir!.watch().listen((event) {
-      if (event.type != FileSystemEvent.modify) {
-        Navigator.popUntil(context, ModalRoute.withName('/'));
         return;
       }
 
-      String sim = fileSim!.readAsStringSync();
-
-      if (sim.contains(":-")) {
-        noSimData = false;
-      }
-
       setState(() {
-        graph = Graph.fromFile(fileEco!.readAsStringSync(), sim);
+        graph = Graph.fromFile(fileEco!.readAsStringSync(), "");
       });
       return;
     });
@@ -209,6 +221,7 @@ class _FullscreenPageState extends State<FullscreenPage> {
   );
   UniqueKey cpsKey = UniqueKey();
   int? numIter;
+
   dynamic focused;
 
   int page = 0;
@@ -219,6 +232,19 @@ class _FullscreenPageState extends State<FullscreenPage> {
     setState(() {
       focused = focused_;
     });
+  }
+
+  @override
+  void didUpdateWidget(var old) {
+    super.didUpdateWidget(old);
+    if (old.graph != widget.graph) {
+      cpsKey = UniqueKey();
+      numIter = null;
+      focused = null;
+      page = 0;
+      type = GraphType.stackedArea;
+      setState(() {});
+    }
   }
 
   @override
@@ -234,7 +260,6 @@ class _FullscreenPageState extends State<FullscreenPage> {
           Positioned.fill(
             child: PageView(
               onPageChanged: (int page) {
-                cpsKey = UniqueKey();
                 setState(() {
                   this.page = page;
                 });
@@ -624,7 +649,8 @@ class _InfoWidgetState extends State<InfoWidget> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.focused == null) {
+    if (widget.focused == null ||
+        (!(widget.focused is Node) && !(widget.focused is MyEdge))) {
       return const Padding(
         padding: EdgeInsets.all(8.0),
         child: Center(child: Text("No node or edge selected")),
@@ -678,7 +704,7 @@ class _NodeInfoWidgetState extends State<NodeInfoWidget> {
         });
       },
       title: Text(
-        '${widget.node.name} '
+        '${widget.node.name.replaceAll("_", " ")} '
         '(${widget.node.alias}) ${showAll ? ' :' : '...'}',
       ),
       subtitle: showAll

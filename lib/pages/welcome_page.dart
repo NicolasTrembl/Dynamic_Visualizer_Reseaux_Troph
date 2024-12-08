@@ -92,7 +92,7 @@ class _WelcomePageState extends State<WelcomePage> {
                     ),
                   ),
                   TextSpan(
-                    text: "get link",
+                    text: "Dynamic mode",
                     style: TextStyle(
                       color: Colors.redAccent.shade400,
                       fontWeight: FontWeight.bold,
